@@ -65,103 +65,6 @@ The system consists of three primary components:
 
 The database is logically divided into two schemas:
 
-#### 3.1.1 Shared Schema (Synchronized)
-Contains all business data that is synchronized across instances:
-```sql
-CREATE SCHEMA shared;
-
-CREATE TABLE shared.companies (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    website VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE shared.products (
-    id SERIAL PRIMARY KEY,
-    company_id INTEGER REFERENCES shared.companies(id),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE shared.scores (
-    id SERIAL PRIMARY KEY,
-    company_id INTEGER REFERENCES shared.companies(id),
-    product_id INTEGER REFERENCES shared.products(id) NULL,
-    category VARCHAR(50) NOT NULL,
-    score FLOAT NOT NULL,
-    evidence TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE shared.reviews (
-    id SERIAL PRIMARY KEY,
-    product_id INTEGER REFERENCES shared.products(id),
-    content TEXT NOT NULL,
-    author VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-#### 3.1.2 Instance Schema (Not Synchronized)
-Contains instance-specific data, including authentication:
-```sql
-CREATE SCHEMA instance;
-
-CREATE TABLE instance.users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE instance.config (
-    key VARCHAR(255) PRIMARY KEY,
-    value TEXT NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE instance.sync_status (
-    id SERIAL PRIMARY KEY,
-    last_sync_time TIMESTAMP WITH TIME ZONE,
-    tables_synced INTEGER,
-    status VARCHAR(50),
-    error_message TEXT
-);
-```
-
-### 3.2 Registry Service Schema
-
-```sql
-CREATE TABLE api_instances (
-    id VARCHAR(36) PRIMARY KEY,
-    url VARCHAR(255) NOT NULL UNIQUE,
-    location VARCHAR(255),
-    owner VARCHAR(255),
-    version VARCHAR(50) NOT NULL,
-    last_checked TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    uptime_percentage FLOAT DEFAULT 100.0,
-    average_latency_ms INTEGER DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'online',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE health_checks (
-    id SERIAL PRIMARY KEY,
-    instance_id VARCHAR(36) REFERENCES api_instances(id),
-    checked_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    latency_ms INTEGER NOT NULL,
-    success BOOLEAN NOT NULL,
-    error_message TEXT
-);
-```
-
 ### 3.3 Data Synchronization
 
 Self-hosted instances synchronize data using the following process:
@@ -171,55 +74,7 @@ Self-hosted instances synchronize data using the following process:
 3. **Transaction-based Updates**: Apply changes in transactions to maintain consistency
 4. **Tracking**: Record synchronization status for monitoring and troubleshooting
 
-Example synchronization code:
-```go
-func (s *SyncService) SyncTable(ctx context.Context, tableName string) error {
-    // Get the timestamp of the last sync for this table
-    lastSync, err := s.getLastSyncTime(tableName)
-    if err != nil {
-        return err
-    }
-    
-    // Request data changed since last sync
-    url := fmt.Sprintf("%s/api/sync/%s?since=%s", 
-        s.masterAPIURL, tableName, lastSync.Format(time.RFC3339))
-    
-    resp, err := s.client.Get(url)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
-    
-    // Parse the response
-    var changes struct {
-        Records []map[string]interface{} `json:"records"`
-        Deleted []int                   `json:"deleted"`
-    }
-    
-    if err := json.NewDecoder(resp.Body).Decode(&changes); err != nil {
-        return err
-    }
-    
-    // Begin transaction
-    tx, err := s.db.BeginTx(ctx, nil)
-    if err != nil {
-        return err
-    }
-    defer tx.Rollback()
-    
-    // Apply updates
-    if err := s.applyChanges(ctx, tx, tableName, changes); err != nil {
-        return err
-    }
-    
-    // Update last sync time
-    if err := s.updateSyncTime(ctx, tx, tableName); err != nil {
-        return err
-    }
-    
-    return tx.Commit()
-}
-```
+
 
 ### 3.4 Data Integrity Verification
 
@@ -250,26 +105,6 @@ The platform allows users to suggest company data, reviews, and scores through a
 3. **Moderation**: Administrators review, edit, and approve/reject submissions
 4. **Application**: Approved suggestions are applied to the database
 5. **Notification**: Submitters may receive status updates (optional)
-
-### 4.2 Suggestion Queue Schema
-
-```sql
-CREATE TABLE suggestion_queue (
-    id SERIAL PRIMARY KEY,
-    company_id INTEGER REFERENCES shared.companies(id),
-    product_id INTEGER REFERENCES shared.products(id) NULL,
-    suggestion_type VARCHAR(50) NOT NULL,
-    content JSONB NOT NULL,
-    submitter_email VARCHAR(255),
-    submitter_name VARCHAR(255),
-    submitter_ip VARCHAR(45),
-    status VARCHAR(20) DEFAULT 'pending',
-    mod_notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    reviewed_at TIMESTAMP WITH TIME ZONE NULL,
-    reviewed_by VARCHAR(255) NULL
-);
-```
 
 ### 4.3 Moderation Workflow
 
@@ -306,14 +141,7 @@ The website similarly implements smart API selection:
 
 Both master and self-hosted instances are packaged as Docker containers for easy deployment:
 
-```Dockerfile
-FROM golang:1.21-alpine
-WORKDIR /app
-COPY . .
-RUN go build -o api
-EXPOSE 8080
-CMD ["./api"]
-```
+
 
 ### 6.2 Environment Configuration
 
