@@ -216,16 +216,16 @@ The architecture's flexibility allows for future expansion and adapts to varying
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/health` | GET | Health check endpoint |
-| `/api/sync/:table` | GET | Synchronization endpoint for specific table |
-| `/api/companies` | GET | List companies |
-| `/api/companies/:id` | GET | Get company details |
-| `/api/products` | GET | List products |
-| `/api/products/:id` | GET | Get product details |
-| `/api/suggestions` | POST | Submit a suggestion |
-| `/api/admin/suggestions` | GET | List pending suggestions (admin only) |
-| `/api/instances` | GET | List API instances |
-| `/api/public-key` | GET | Fetch verification public key |
+| `/v1/health` | GET | Health check endpoint |
+| `/v1/sync/:table` | GET | Synchronization endpoint for specific table |
+| `/v1/companies` | GET | List companies |
+| `/v1/companies/:id` | GET | Get company details |
+| `/v1/products` | GET | List products |
+| `/v1/products/:id` | GET | Get product details |
+| `/v1/suggestions` | POST | Submit a suggestion |
+| `/v1/admin/suggestions` | GET | List pending suggestions (admin only) |
+| `/v1/instances` | GET | List API instances |
+| `/v1/public-key` | GET | Fetch verification public key |
 
 ## Appendix B: Technology Stack
 
